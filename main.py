@@ -18,7 +18,6 @@ def load_config():
 CONFIG = load_config()
 OBSIDIAN_VAULT_PATH = CONFIG.get("obsidian_vault_path", "./")  # Default to current directory if not set
 
-
 def load_logs():
     """Load existing logs from file."""
     try:
@@ -53,11 +52,22 @@ def add_entry(task=None, reflection=None):
     export_to_obsidian(date, logs[date])  # Export to Obsidian after saving
     print(f"Entry added for {date}")
 
+def batch_add(batch_data):
+    """Add multiple entries to the log from batch data."""
+    logs = load_logs()
+    for date, entry in batch_data.items():
+        logs.setdefault(date, {"tasks": [], "reflection": ""})
+        logs[date]["tasks"].extend(entry.get("tasks", []))
+        if entry.get("reflection"):
+            logs[date]["reflection"] = entry["reflection"]
+        export_to_obsidian(date, logs[date])  # Export to Obsidian after saving
+    save_logs(logs)
+    print("Batch entries added successfully.")
+
 def export_to_obsidian(date, log_entry):
     """Export the log entry to an Obsidian markdown file."""
     file_path = os.path.join(OBSIDIAN_VAULT_PATH, f"{date}.md")
     content = format_markdown(date, log_entry)
-
     try:
         with open(file_path, "w") as file:
             file.write(content)
@@ -75,11 +85,23 @@ def main():
     parser = argparse.ArgumentParser(description="Daily Log CLI Tool")
     parser.add_argument("--add-task", type=str, help="Add a task")
     parser.add_argument("--add-reflection", type=str, help="Add a reflection")
+    parser.add_argument("--batch-add", type=str, help="Batch add tasks and reflections from a JSON string or file")
     parser.add_argument("--list-logs", action="store_true", help="List all logs")
     args = parser.parse_args()
 
     if args.add_task or args.add_reflection:
         add_entry(task=args.add_task, reflection=args.add_reflection)
+    elif args.batch_add:
+        try:
+            # Load batch data from JSON string or file
+            if os.path.exists(args.batch_add):
+                with open(args.batch_add, "r") as file:
+                    batch_data = json.load(file)
+            else:
+                batch_data = json.loads(args.batch_add)
+            batch_add(batch_data)
+        except Exception as e:
+            print(f"Failed to process batch add: {e}")
     elif args.list_logs:
         list_logs()
     else:
